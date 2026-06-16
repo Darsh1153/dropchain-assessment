@@ -6,7 +6,11 @@ import {
   providerMode,
   type RetrievedContext,
 } from "@/lib/server/provider";
-import { vectorStore } from "@/lib/server/vectorStore";
+import {
+  type ChunkRecord,
+  searchChunks,
+  vectorStore,
+} from "@/lib/server/vectorStore";
 
 const MAX_FILE_BYTES = 1024 * 1024;
 
@@ -55,33 +59,50 @@ export async function ingestDocument(input: {
     throw new Error("Text produced no usable chunks.");
   }
 
-  vectorStore.clear();
   const embeddings = await embed(chunks);
-  const added = vectorStore.add(
-    chunks.map((chunk, i) => ({ text: chunk, embedding: embeddings[i], source })),
-  );
+  const storedChunks: ChunkRecord[] = chunks.map((chunk, i) => ({
+    text: chunk,
+    embedding: embeddings[i],
+    source,
+  }));
+
+  vectorStore.clear();
+  vectorStore.add(storedChunks);
 
   const stats = vectorStore.stats();
   return {
     ok: true as const,
     mode: providerMode,
-    chunksAdded: added,
+    chunksAdded: storedChunks.length,
     totalChunks: stats.chunkCount,
     sources: stats.sources,
+    storedChunks,
   };
 }
 
-export async function queryDocument(question: string, k = 4) {
+export async function queryDocument(
+  question: string,
+  k = 4,
+  clientChunks?: ChunkRecord[],
+) {
   const trimmed = question.trim();
   if (!trimmed) {
     throw new Error("A non-empty 'question' is required.");
   }
-  if (vectorStore.size === 0) {
+
+  const chunks =
+    clientChunks && clientChunks.length > 0
+      ? clientChunks
+      : vectorStore.size > 0
+        ? vectorStore.getAll()
+        : null;
+
+  if (!chunks || chunks.length === 0) {
     throw new Error("Knowledge base is empty. Ingest a document first.");
   }
 
   const [queryEmbedding] = await embed([trimmed]);
-  const results = vectorStore.search(queryEmbedding, clampK(k));
+  const results = searchChunks(chunks, queryEmbedding, clampK(k));
 
   const contexts: RetrievedContext[] = results.map((r) => ({
     text: r.text,

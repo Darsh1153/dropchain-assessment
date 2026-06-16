@@ -8,6 +8,7 @@ import {
   resetKnowledgeBase,
   type Citation,
   type ProviderMode,
+  type StoredChunk,
 } from "@/lib/api";
 
 interface KbStatus {
@@ -28,6 +29,7 @@ export default function Home() {
   const [answerMode, setAnswerMode] = useState<ProviderMode | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+  const [storedChunks, setStoredChunks] = useState<StoredChunk[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const hasKb = (kb?.chunks ?? 0) > 0;
@@ -42,9 +44,11 @@ export default function Home() {
     try {
       const res = await ingestText(docText, "pasted-text");
       setKb({ chunks: res.totalChunks, sources: res.sources, mode: res.mode });
+      setStoredChunks(res.storedChunks);
     } catch (e) {
       setError(messageOf(e));
       setKb(null);
+      setStoredChunks([]);
     } finally {
       setIngesting(false);
     }
@@ -70,9 +74,11 @@ export default function Home() {
       setDocText(content);
       const res = await ingestFile(file);
       setKb({ chunks: res.totalChunks, sources: res.sources, mode: res.mode });
+      setStoredChunks(res.storedChunks);
     } catch (e) {
       setError(messageOf(e));
       setKb(null);
+      setStoredChunks([]);
     } finally {
       setIngesting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -86,7 +92,7 @@ export default function Home() {
     setAnswer(null);
     setCitations([]);
     try {
-      const res = await queryKnowledgeBase(question);
+      const res = await queryKnowledgeBase(question, storedChunks);
       setAnswer(res.answer);
       setCitations(res.citations);
       setAnswerMode(res.mode);
@@ -105,6 +111,7 @@ export default function Home() {
       setError(messageOf(e));
     }
     setKb(null);
+    setStoredChunks([]);
     setDocText("");
     setAnswer(null);
     setCitations([]);

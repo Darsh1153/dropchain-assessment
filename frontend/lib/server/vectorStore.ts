@@ -7,6 +7,12 @@ export interface StoredChunk {
   source: string;
 }
 
+export interface ChunkRecord {
+  text: string;
+  embedding: number[];
+  source: string;
+}
+
 export interface SearchResult {
   id: string;
   text: string;
@@ -48,6 +54,14 @@ class VectorStore {
   get size(): number {
     return this.chunks.length;
   }
+
+  getAll(): ChunkRecord[] {
+    return this.chunks.map(({ text, embedding, source }) => ({
+      text,
+      embedding,
+      source,
+    }));
+  }
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {
@@ -62,6 +76,22 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   }
   if (normA === 0 || normB === 0) return 0;
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+export function searchChunks(
+  chunks: ChunkRecord[],
+  queryEmbedding: number[],
+  k: number,
+): SearchResult[] {
+  return chunks
+    .map((chunk, index) => ({
+      id: String(index),
+      text: chunk.text,
+      source: chunk.source,
+      score: cosineSimilarity(queryEmbedding, chunk.embedding),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k);
 }
 
 const globalStore = globalThis as typeof globalThis & {

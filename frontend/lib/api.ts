@@ -13,12 +13,19 @@ function apiBase(): string {
 
 export type ProviderMode = "gemini" | "mock";
 
+export interface StoredChunk {
+  text: string;
+  embedding: number[];
+  source: string;
+}
+
 export interface IngestResponse {
   ok: true;
   mode: ProviderMode;
   chunksAdded: number;
   totalChunks: number;
   sources: string[];
+  storedChunks: StoredChunk[];
 }
 
 export interface Citation {
@@ -58,11 +65,15 @@ export async function ingestFile(file: File): Promise<IngestResponse> {
   return handle<IngestResponse>(res);
 }
 
-export async function queryKnowledgeBase(question: string, k = 4): Promise<QueryResponse> {
+export async function queryKnowledgeBase(
+  question: string,
+  storedChunks: StoredChunk[],
+  k = 4,
+): Promise<QueryResponse> {
   const res = await fetch(`${apiBase()}/api/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, k }),
+    body: JSON.stringify({ question, k, storedChunks }),
   });
   return handle<QueryResponse>(res);
 }
