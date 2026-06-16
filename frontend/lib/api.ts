@@ -1,10 +1,15 @@
 /**
- * Typed client for the RAG backend. The base URL is injected at build time via
- * NEXT_PUBLIC_API_BASE_URL so the browser can reach the API directly.
+ * Typed client for the RAG API.
+ * On Vercel (and local Next.js dev) calls same-origin /api routes.
+ * Set NEXT_PUBLIC_API_BASE_URL to point at a separate backend if needed.
  */
 
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:4000";
+function apiBase(): string {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "");
+  if (configured) return configured;
+  if (typeof window !== "undefined") return "";
+  return "http://localhost:3000";
+}
 
 export type ProviderMode = "gemini" | "mock";
 
@@ -38,7 +43,7 @@ async function handle<T>(res: Response): Promise<T> {
 }
 
 export async function ingestText(text: string, source?: string): Promise<IngestResponse> {
-  const res = await fetch(`${BASE_URL}/api/ingest`, {
+  const res = await fetch(`${apiBase()}/api/ingest`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, source }),
@@ -49,12 +54,12 @@ export async function ingestText(text: string, source?: string): Promise<IngestR
 export async function ingestFile(file: File): Promise<IngestResponse> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${BASE_URL}/api/ingest`, { method: "POST", body: form });
+  const res = await fetch(`${apiBase()}/api/ingest`, { method: "POST", body: form });
   return handle<IngestResponse>(res);
 }
 
 export async function queryKnowledgeBase(question: string, k = 4): Promise<QueryResponse> {
-  const res = await fetch(`${BASE_URL}/api/query`, {
+  const res = await fetch(`${apiBase()}/api/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, k }),
@@ -63,6 +68,6 @@ export async function queryKnowledgeBase(question: string, k = 4): Promise<Query
 }
 
 export async function resetKnowledgeBase(): Promise<void> {
-  const res = await fetch(`${BASE_URL}/api/reset`, { method: "POST" });
+  const res = await fetch(`${apiBase()}/api/reset`, { method: "POST" });
   await handle(res);
 }
